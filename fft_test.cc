@@ -1,6 +1,10 @@
+#ifndef FFT_TEST_H_
+#define FFT_TEST_H_
+
 #include <fftw3.h>
 #include <iostream>
 #include <cmath>
+#include "gnuplot.h"
 
 #include <vector>
 
@@ -20,27 +24,30 @@ int main() {
   // Sample time, duration in seconds processed in a single FFT pass
   double Ts = 1 / Fs;
 
-  double * theta  = new double[N_SAMPLES];
+  double A = 1.0;
+  double freq_a = 440.0;
+  double freq_c = 523.25;
+  double freq_e = 659.26;
+
+  std::vector<double> theta(N_SAMPLES);
 
   fftw_complex signal[N_SAMPLES];
   fftw_complex result[N_SAMPLES];
 
-  FILE * gnuplot_pipe_s = popen ("gnuplot -persistent", "w");
-  fprintf(gnuplot_pipe_s, "plot [0:882] '-' with lines\n");
+  Gnuplot gp_signal, gp_db_spectrum;
+  gp_signal.plot_xrange(0, 882);
 
-  for (int i = 0; i < N_SAMPLES; ++i) {
-    theta[i]        = (static_cast<double>(i)/static_cast<double>(N_SAMPLES)) *
-                      2.0 * M_PI;
-    signal[i][REAL] =   1.0 * sin(440.0  * theta[i])
-                 //   + 0.5 * sin(523.25 * theta[i])
-                 //   + 1.0 * sin(659.26 * theta[i])
+  for (int i = 0; i < N_SAMPLES; i++) {
+    theta[i]        = (static_cast<double>(i)/static_cast<double>(N_SAMPLES))
+                    * 2.0 * M_PI;
+    signal[i][REAL] = A   * sin(freq_a * theta[i])
+                    + A/2 * sin(freq_c * theta[i])
+                    + A/3 * sin(freq_e * theta[i])
                       ;
     signal[i][IMAG] = 0;
 
-    fprintf(gnuplot_pipe_s, "%hu %f\n", i, signal[i][REAL]);
+    gp_signal.write_data(i, signal[i][REAL]);
   }
-  fprintf(gnuplot_pipe_s, "e\n");
-  fflush(gnuplot_pipe_s);
 
   fftw_plan plan = fftw_plan_dft_1d(N_SAMPLES,
                                     signal, result,
@@ -50,25 +57,22 @@ int main() {
 
   // Post-process frequency spectrum: transform to decibel
   std::vector<double> db_spectrum(N_BINS);
-  for(int i = 0; i <= N_BINS; i++){
-     db_spectrum[i] = (20 * 
+  for(int i = 0; i < N_BINS; i++){
+     db_spectrum[i] = (20 *
                         log(sqrt(  result[i][REAL] * result[i][REAL]
                                  + result[i][IMAG] * result[i][IMAG]))
                       ) / F_SAMPLING;
   }
 
-  FILE * gnuplot_pipe_f = popen ("gnuplot -persistent", "w");
-  fprintf(gnuplot_pipe_f, "plot [350:750] '-' with lines\n");
+  gp_db_spectrum.plot_xrange(350, N_BINS);
 
   for(int i = 0; i < N_BINS; i++) {
-    std::cout << db_spectrum[i] << std::endl;
-    fprintf(gnuplot_pipe_f, "%hu %f\n", i, db_spectrum[i]);
+    // std::cout << db_spectrum[i] << std::endl;
+    gp_db_spectrum.write_data(i, db_spectrum[i]);
   }
 
-  fprintf(gnuplot_pipe_f, "e\n");
-  fflush(gnuplot_pipe_f);
-
   fftw_destroy_plan(plan);
-  delete[] theta;
   return 0;
 }
+
+#endif
