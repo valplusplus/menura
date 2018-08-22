@@ -26,8 +26,9 @@ int main() {
 
   double A = 1.0;
   double freq_a = 440.0;
-  double freq_c = 523.25;
-  double freq_e = 659.26;
+  double freq_c = std::pow(2.0,(52.0-49.0)/12.0)*freq_a; // 523.251;
+  double freq_e = std::pow(2.0,(56.0-49.0)/12.0)*freq_a; // 659.255;
+  std::cout << freq_c << ", " << freq_e << std::endl;
 
   std::vector<double> theta(N_SAMPLES);
 
