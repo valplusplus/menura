@@ -24,68 +24,48 @@ std::vector<std::string> notes {
   "C8","C#8","D8","D#8","E8","F8","F#8","G8","G#8","A8","A#8","B8",
   "C9","C#9","D9","D#9","E9","F9","F#9","G9","G#9","A9","A#9","B9"};
 
-std::string fton(const double frequency) {
-  double r = std::pow(2.0, 1.0/12.0);
-  double cent = std::pow(2.0, 1.0/1200.0);
-  int r_index = 0;
-  int cent_index = 0;
+std::string note_of(double frequency, double pitch_hz = 440.0) {
+  int cent_idx = 0;
   int side;
 
-  double concert_pitch = 440.0;
+  int note_idx =   12 * std::log2(frequency/pitch_hz) + A4_IDX;
 
-  if(frequency >= concert_pitch) {
-   while(frequency >= r*concert_pitch) {
-     concert_pitch = r*concert_pitch;
-     r_index++;
-   }
-   while(frequency > cent*concert_pitch) {
-     concert_pitch = cent*concert_pitch;
-     cent_index++;
-   }
-   if((cent*concert_pitch - frequency) < (frequency - concert_pitch))
-     cent_index++;
-   if(cent_index > 50) {
-     r_index++;
-     cent_index = 100 - cent_index;
-     if(cent_index != 0)
-       side = MINUS;
-     else
-       side = PLUS;
-   }
-   else
-     side = PLUS;
+  pitch_hz = pitch_hz * std::pow(2.0, (note_idx-A4_IDX)/12.0);
+
+  if(frequency >= pitch_hz) {
+    cent_idx = 1200 * std::log2(frequency/pitch_hz);
+    cerr << cent_idx << endl;
+    if(cent_idx >= 50) {
+      note_idx++;
+      cent_idx = 100 - cent_idx;
+      if(cent_idx != 0)
+        side = MINUS;
+      else
+        side = PLUS;
+    } else {
+      side = PLUS;
+    }
+  } else {
+    cent_idx = 1200 * std::log2(pitch_hz/frequency);
+    cerr << cent_idx << endl;
+    if(cent_idx >= 50) {
+      note_idx--;
+      cent_idx = 100 - cent_idx;
+        if(cent_idx != 0)
+          side = MINUS;
+        else
+          side = PLUS;
+    } else {
+        side = PLUS;
+    }
   }
 
-  else {
-   while(frequency <= concert_pitch/r) {
-     concert_pitch = concert_pitch/r;
-     r_index--;
-   }
-   while(frequency < concert_pitch/cent) {
-     concert_pitch = concert_pitch/cent;
-     cent_index++;
-   }
-   if((frequency - concert_pitch/cent) < (concert_pitch - frequency))
-     cent_index++;
-   if(cent_index >= 50) {
-     r_index--;
-     cent_index = 100 - cent_index;
-     side = PLUS;
-   }
-   else {
-     if(cent_index != 0)
-       side = MINUS;
-     else
-       side = PLUS;
-   }
-  }
-
-  auto result = notes[A4_IDX + r_index];
+  auto result = notes[note_idx];
   if(side == PLUS)
    result = result + " (+";
   else
    result = result + " (-";
-  result = result + std::to_string(cent_index) + " cents)";
+  result = result + std::to_string(cent_idx) + " cents)";
   return result;
 }
 
@@ -95,14 +75,13 @@ int main(int argc, char * argv[]) {
   for (int argi = 1; argi < argc; ) {
     std::string flag(argv[argi]);
     if (flag == "-f") {
-      frequency = std::atof(argv[argi+1]);
+      frequency = std::stod(argv[argi+1]);
       argi += 2;
       continue;
     }
   }
 
-  auto result = fton(frequency);
-  cerr << "Frequency " << frequency << "Hz --> Note " << result << endl;
+  cerr << "Frequency " << frequency << " Hz --> Note " << note_of(frequency) << endl;
 
   return 0;
 }
