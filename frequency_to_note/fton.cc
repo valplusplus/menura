@@ -29,14 +29,18 @@ std::string note_of(double frequency, double pitch_hz = 440.0) {
   int side;
 
   int note_idx =   12 * std::log2(frequency/pitch_hz) + A4_IDX;
+  // cerr << "Detected note: " << notes[note_idx] << endl;
 
-  pitch_hz = pitch_hz * std::pow(2.0, (note_idx-A4_IDX)/12.0);
+  double ideal_freq = pitch_hz * std::pow(2.0, (note_idx-A4_IDX)/12.0);
+  // cerr << "Ideal frequency: " << ideal_freq << endl;
 
-  if(frequency >= pitch_hz) {
-    cent_idx = 1200 * std::log2(frequency/pitch_hz);
-    cerr << cent_idx << endl;
-    if(cent_idx >= 50) {
+  cent_idx = 1200 * std::log2(frequency/ideal_freq);
+  // cerr << "Difference in cents: " << cent_idx << endl;
+
+  if(frequency >= ideal_freq) {
+    if(cent_idx > 50) {
       note_idx++;
+      // cerr << "Closest note: " << notes[note_idx] << endl;
       cent_idx = 100 - cent_idx;
       if(cent_idx != 0)
         side = MINUS;
@@ -46,17 +50,16 @@ std::string note_of(double frequency, double pitch_hz = 440.0) {
       side = PLUS;
     }
   } else {
-    cent_idx = 1200 * std::log2(pitch_hz/frequency);
-    cerr << cent_idx << endl;
     if(cent_idx >= 50) {
       note_idx--;
+      // cerr << "Closest note: " << notes[note_idx] << endl;
       cent_idx = 100 - cent_idx;
-        if(cent_idx != 0)
+      side = PLUS;
+    } else {
+      if(cent_idx != 0)
           side = MINUS;
         else
           side = PLUS;
-    } else {
-        side = PLUS;
     }
   }
 
