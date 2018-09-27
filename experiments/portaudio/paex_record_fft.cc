@@ -58,7 +58,7 @@
 #define N_SAMPLES  (SAMPLE_RATE / (MAX_BPM / 60 * 2))
 #define N_BINS     (N_SAMPLES/2)-1
 #define NUM_SECONDS     (1)
-#define NUM_CHANNELS    (2)
+#define NUM_CHANNELS    (1)
 #define NUM_SAMPLES    (NUM_SECONDS * SAMPLE_RATE * NUM_CHANNELS)
 #define NUM_BINS     (NUM_SAMPLES/2)-1
 /* #define DITHER_FLAG     (paDitherOff) */
@@ -94,8 +94,8 @@ typedef struct
 {
     int          frameIndex;  /* Index into sample array. */
     int          maxFrameIndex;
-    fftw_complex      *recordedSamples;
-    fftw_complex      *fftwOutput;
+    double      *recordedSamples;
+    double      *fftwOutput;
 }
 paTestData;
 
@@ -113,7 +113,7 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
 {
     paTestData *data = (paTestData*)userData;
     const SAMPLE *rptr = (const SAMPLE*)inputBuffer;
-    fftw_complex *wptr = &data->recordedSamples[data->frameIndex * NUM_CHANNELS];
+    double *wptr = &data->recordedSamples[data->frameIndex * NUM_CHANNELS];
     long framesToCalc;
     long i;
     int finished;
@@ -139,20 +139,16 @@ static int recordCallback( const void *inputBuffer, void *outputBuffer,
     {
         for( i=0; i<framesToCalc; i++ )
         {
-            *wptr[0] = SAMPLE_SILENCE;  /* left */
-            wptr++;
-            if( NUM_CHANNELS == 2 ) *wptr[0] = SAMPLE_SILENCE;  /* right */
-            wptr++;
+            *wptr++ = SAMPLE_SILENCE;  /* left */
+            if( NUM_CHANNELS == 2 ) *wptr++ = SAMPLE_SILENCE;  /* right */
         }
     }
     else
     {
         for( i=0; i<framesToCalc; i++ )
         {
-            *wptr[0] = *rptr++;  /* left */
-            wptr++;
-            if( NUM_CHANNELS == 2 ) *wptr[0] = *rptr++;  /* right */
-            wptr++;
+            *wptr++ = *rptr++;  /* left */
+            if( NUM_CHANNELS == 2 ) *wptr++ = *rptr++;  /* right */
         }
     }
     data->frameIndex += framesToCalc;
@@ -180,25 +176,44 @@ int main(void)
 
     printf("patest_record.c\n"); fflush(stdout);
 
+    std::cout << std::endl;
+    std::cout << "SAMPLE_RATE: "       << SAMPLE_RATE       << std::endl;
+    std::cout << "FRAMES_PER_BUFFER: " << FRAMES_PER_BUFFER << std::endl;
+    std::cout << "MAX_BPM: "           << MAX_BPM           << std::endl;
+    std::cout << "N_SAMPLES: "         << N_SAMPLES         << std::endl;
+    std::cout << "N_BINS: "            << N_BINS            << std::endl;
+    std::cout << "NUM_SECONDS: "       << NUM_SECONDS       << std::endl;
+    std::cout << "NUM_CHANNELS: "      << NUM_CHANNELS      << std::endl;
+    std::cout << "NUM_SAMPLES: "       << NUM_SAMPLES       << std::endl;
+    std::cout << "NUM_BINS: "          << NUM_BINS          << std::endl;
+
     data.maxFrameIndex = totalFrames = NUM_SECONDS * SAMPLE_RATE; /* Record for a few seconds. */
     data.frameIndex = 0;
     numSamples = totalFrames * NUM_CHANNELS;
-    numBytes = numSamples * sizeof(fftw_complex);
-    data.recordedSamples = (fftw_complex *) malloc( numBytes ); /* From now on, recordedSamples is initialised. */
-    data.fftwOutput = (fftw_complex *) malloc( numBytes );
+    numBytes = numSamples * sizeof(double);
+
+    std::cout << "data.maxFrameIndex: " << data.maxFrameIndex << std::endl;
+    std::cout << "data.frameIndex: "    << data.frameIndex    << std::endl;
+    std::cout << "numSamples: "         << numSamples         << std::endl;
+    std::cout << "numBytes: "           << numBytes           << std::endl;
+    std::cout << std::endl;
+
+    data.recordedSamples = (double *) malloc( numBytes ); /* From now on, recordedSamples is initialised. */
+    data.fftwOutput = (double *) malloc( numBytes );
     if( data.recordedSamples == NULL )
     {
         printf("Could not allocate record array.\n");
         goto done;
     }
-    for( i=0; i<numSamples; i++ ) data.recordedSamples[i][REAL] = 0;
+    for( i=0; i<numSamples; i++ ) data.recordedSamples[i] = 0;
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
 
-    /*fftw_plan */plan = fftw_plan_dft_1d(NUM_SAMPLES,
+    /*fftw_plan */plan = fftw_plan_r2r_1d(NUM_SAMPLES,
                                       data.recordedSamples, data.fftwOutput,
-                                      FFTW_FORWARD,
+                                      FFTW_R2HC,
+                                      // FFTW_FORWARD,
                                       FFTW_ESTIMATE);
 
     inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
@@ -206,7 +221,7 @@ int main(void)
         fprintf(stderr,"Error: No default input device.\n");
         goto done;
     }
-    inputParameters.channelCount = 2;                    /* stereo input */
+    inputParameters.channelCount = 1;                    /* mono input */
     inputParameters.sampleFormat = PA_SAMPLE_TYPE;
     inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
     inputParameters.hostApiSpecificStreamInfo = NULL;
@@ -237,8 +252,8 @@ int main(void)
         std::vector<double> db_spectrum(NUM_BINS);
         for(int i = 0; i < NUM_BINS; i++){
            db_spectrum[i] = (20 *
-                              log10(sqrt(  data.fftwOutput[i][REAL] * data.fftwOutput[i][REAL]
-                                       + data.fftwOutput[i][IMAG] * data.fftwOutput[i][IMAG]))
+                              log10(sqrt(  data.fftwOutput[i] * data.fftwOutput[i]
+                              /*+ data.fftwOutput[i] * data.fftwOutput[i]*/))
                             ) / SAMPLE_RATE;
         }
         std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
@@ -259,7 +274,7 @@ int main(void)
     average = 0.0;
     for( i=0; i<numSamples; i++ )
     {
-        val = data.recordedSamples[i][0];
+        val = data.recordedSamples[i];
         if( val < 0 ) val = -val; /* ABS */
         if( val > max )
         {
