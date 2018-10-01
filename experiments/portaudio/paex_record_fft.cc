@@ -41,6 +41,7 @@
 #include "portaudio.h"
 #include <fftw3.h>
 #include <iostream>
+#include <fstream>
 #include <algorithm>
 #include <cmath>
 #include "../fftw_test/gnuplot.h"
@@ -64,7 +65,6 @@
 /* #define DITHER_FLAG     (paDitherOff) */
 #define DITHER_FLAG     (0)
 
-#define WRITE_TO_FILE   (0)
 //#define N_SAMPLES  (SAMPLE_RATE / (FRAMES_PER_BUFFER / 60 * 2))
 
 /* Select sample format. */
@@ -173,6 +173,9 @@ int main(void)
     double              average;
     bool                running;
     Gnuplot             gp_db_spectrum;
+    int interrupt = 0;
+    std::vector<double> db_spectrum(NUM_BINS);
+    std::ofstream       file;
 
     printf("patest_record.c\n"); fflush(stdout);
 
@@ -242,28 +245,34 @@ int main(void)
     if( err != paNoError ) goto done;
     printf("\n=== Now recording!! Please whistle into the microphone. ===\n"); fflush(stdout);
 
-    while( ( err = Pa_IsStreamActive( stream ) ) == 1 )
+    file.open("recorded.txt");
+    file << "Hz\t dB" << std::endl;
+
+    while( (( err = Pa_IsStreamActive( stream ) ) == 1) && (interrupt < 200) )
     {
       data.frameIndex = 0;
         // Pa_Sleep(1000);
         fftw_execute(plan);
 
     // Post-process frequency spectrum: transform to decibel
-        std::vector<double> db_spectrum(NUM_BINS);
+        // std::vector<double> db_spectrum(NUM_BINS);
         for(int i = 0; i < NUM_BINS; i++){
            db_spectrum[i] = (20 *
                               log10(sqrt(  data.fftwOutput[i] * data.fftwOutput[i]
                               /*+ data.fftwOutput[i] * data.fftwOutput[i]*/))
-                            ) / SAMPLE_RATE;
+                            );// / SAMPLE_RATE;
         }
         std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
                                                              db_spectrum.end());
         std::cout << "Detected frequency: "
                   << std::distance(db_spectrum.begin(), max)
                   << " Hz at velocity " << *max * 127 << std::endl;
-        printf("index = %d\n", data.frameIndex ); fflush(stdout);
+        file << std::distance(db_spectrum.begin(), max) << "\t " << *max << std::endl;
+        std::cout << "Wrote data to recorded.txt." << std::endl;
+        std::cout << "index = " << data.frameIndex << std::endl; //fflush(stdout);
+        interrupt++;
     }
-
+    file.close();
     if( err < 0 ) goto done;
 
     err = Pa_CloseStream( stream );
@@ -287,25 +296,6 @@ int main(void)
 
     printf("sample max amplitude = "PRINTF_S_FORMAT"\n", max );
     printf("sample average = %lf\n", average );
-
-    /* Write recorded data to a file. */
-#if WRITE_TO_FILE
-    {
-        FILE  *fid;
-        fid = fopen("recorded.raw", "wb");
-        if( fid == NULL )
-        {
-            printf("Could not open file.");
-        }
-        else
-        {
-            fwrite( data.recordedSamples, NUM_CHANNELS * sizeof(SAMPLE), totalFrames, fid );
-            fclose( fid );
-            printf("Wrote data to 'recorded.raw'\n");
-        }
-    }
-#endif
-
 
 done:
     Pa_Terminate();
