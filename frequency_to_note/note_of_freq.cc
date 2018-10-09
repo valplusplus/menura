@@ -2,6 +2,7 @@
 #include <cmath>
 #include <vector>
 #include <fstream>
+#include "pa_stream.h"
 
 namespace menura {
 
@@ -117,13 +118,20 @@ note note_of(double frequency, double pitch_hz = 440.0) {
 }
 
 int main() {
-  double frequency = 440.0;
   menura::note_setup();
 
-  std::ifstream infile("../experiments/portaudio/analyzed.txt");
-  while(infile >> frequency) {
-    std::cerr << "Frequency " << frequency << " Hz --> Note ";
-    menura::note_of(frequency);
+  menura::PortAudio stream;
+
+  stream.init();
+  stream.open();
+  stream.record();
+  stream.analyze();
+
+  auto freqs = stream.detected_frequencies();
+
+  for(int i = 0; i < freqs.size(); i++) {
+    std::cerr << "Frequency " << freqs[i] << " Hz --> Note ";
+    menura::note_of(freqs[i]);
   }
   return 0;
 }

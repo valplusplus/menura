@@ -1,11 +1,12 @@
 
 CC=clang++
-CFLAGS=--std=c++11 -Wall -Wextra -pedantic -g
-LDFLAGS=-lpthread -L${GTEST_BASE}/lib -lgtest
+CFLAGS=--std=c++11 -Wall -Wextra -pedantic -g -I$TACC_FFTW3_INC
+LDFLAGS=-lpthread -L$TACC_FFTW3_LIB -lfftw3 -lrt -lm -lasound -ljack -pthread -lportaudio
 
 INCLUDES=-I${GTEST_BASE}/include -I../
 
-OBJS = 		note_of_freq.o
+OBJS = 		note_of_freq.o \
+			 pa_stream.o
 
 .DEFAULT: all
 all: $(OBJS) fton_test.bin
@@ -27,5 +28,3 @@ clean:
 	-rm -f *.o
 	-rm -f *.a
 	-rm -f *.bin
-	-rm -f ../solution/*.o
-	-rm -f ../solution/*.a
