@@ -44,6 +44,7 @@
 #include <fstream>
 #include <algorithm>
 #include <cmath>
+#include <chrono>
 #include "../fftw_test/gnuplot.h"
 
 #include <vector>
@@ -68,12 +69,12 @@
 //#define N_SAMPLES  (SAMPLE_RATE / (FRAMES_PER_BUFFER / 60 * 2))
 
 /* Select sample format. */
-#if 0
+#if 1
 #define PA_SAMPLE_TYPE  paFloat32
 typedef float SAMPLE;
 #define SAMPLE_SILENCE  (0.0f)
 #define PRINTF_S_FORMAT "%.8f"
-#elif 1
+#elif 0
 #define PA_SAMPLE_TYPE  paInt16
 typedef short SAMPLE;
 #define SAMPLE_SILENCE  (0)
@@ -95,6 +96,7 @@ typedef struct
     int          frameIndex;  /* Index into sample array. */
     int          maxFrameIndex;
     double      *recordedSamples;
+    double      *fftwInput;
     double      *fftwOutput;
 }
 paTestData;
@@ -172,12 +174,15 @@ int main(void)
     SAMPLE              max, val;
     double              average;
     bool                running;
+    std::vector<double> theta(NUM_SAMPLES);
     Gnuplot             gp_db_spectrum;
     int interrupt = 0;
     std::vector<double> db_spectrum(NUM_BINS);
-    std::ofstream       file;
+    std::ofstream       recorded_data;
+    std::ofstream       generated_data;
+    std::ofstream       fftw_data;
 
-    printf("patest_record.c\n"); fflush(stdout);
+    std::cout << "patest_record.c\n";
 
     std::cout << std::endl;
     std::cout << "SAMPLE_RATE: "       << SAMPLE_RATE       << std::endl;
@@ -190,7 +195,8 @@ int main(void)
     std::cout << "NUM_SAMPLES: "       << NUM_SAMPLES       << std::endl;
     std::cout << "NUM_BINS: "          << NUM_BINS          << std::endl;
 
-    data.maxFrameIndex = totalFrames = NUM_SECONDS * SAMPLE_RATE; /* Record for a few seconds. */
+    data.maxFrameIndex = totalFrames = NUM_SECONDS * SAMPLE_RATE; /* Record for
+                                                               a few seconds. */
     data.frameIndex = 0;
     numSamples = totalFrames * NUM_CHANNELS;
     numBytes = numSamples * sizeof(double);
@@ -201,14 +207,25 @@ int main(void)
     std::cout << "numBytes: "           << numBytes           << std::endl;
     std::cout << std::endl;
 
-    data.recordedSamples = (double *) malloc( numBytes ); /* From now on, recordedSamples is initialised. */
+    data.recordedSamples = (double *) malloc( numBytes ); /* From now on,
+                                       recordedSamples is initialised. */
+    data.fftwInput = (double *) malloc( numBytes );
     data.fftwOutput = (double *) malloc( numBytes );
     if( data.recordedSamples == NULL )
     {
-        printf("Could not allocate record array.\n");
+        std::cout << "\nCould not allocate record array.\n";
         goto done;
     }
-    for( i=0; i<numSamples; i++ ) data.recordedSamples[i] = 0;
+    generated_data.open("generated.txt");
+    for( i=0; i<numSamples; i++ ) {
+      data.recordedSamples[i] = 0;
+      theta[i]        = (static_cast<double>(i)/static_cast<double>(numSamples))
+                      * 2.0 * M_PI;
+      data.fftwInput[i] = 1.0  * sin(472.123 * theta[i]);
+      generated_data << data.fftwInput[i] << std::endl;
+    }
+    generated_data.close();
+        std::cout << "\nSetup OK.\n";
 
     err = Pa_Initialize();
     if( err != paNoError ) goto done;
@@ -219,14 +236,16 @@ int main(void)
                                       // FFTW_FORWARD,
                                       FFTW_ESTIMATE);
 
-    inputParameters.device = Pa_GetDefaultInputDevice(); /* default input device */
+    inputParameters.device = Pa_GetDefaultInputDevice(); /* default input
+                                                                device */
     if (inputParameters.device == paNoDevice) {
-        fprintf(stderr,"Error: No default input device.\n");
+        std::cerr << "Error: No default input device.\n";
         goto done;
     }
     inputParameters.channelCount = 1;                    /* mono input */
     inputParameters.sampleFormat = PA_SAMPLE_TYPE;
-    inputParameters.suggestedLatency = Pa_GetDeviceInfo( inputParameters.device )->defaultLowInputLatency;
+    inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)
+                                     ->defaultLowInputLatency;
     inputParameters.hostApiSpecificStreamInfo = NULL;
 
     /* Record some audio. -------------------------------------------- */
@@ -236,43 +255,49 @@ int main(void)
               NULL,                  /* &outputParameters, */
               SAMPLE_RATE,
               FRAMES_PER_BUFFER,
-              paClipOff,      /* we won't output out of range samples so don't bother clipping them */
+              paClipOff,      /* we won't output out of range samples so don't
+                                                       bother clipping them */
               recordCallback,
               &data );
     if( err != paNoError ) goto done;
 
     err = Pa_StartStream( stream );
     if( err != paNoError ) goto done;
-    printf("\n=== Now recording!! Please whistle into the microphone. ===\n"); fflush(stdout);
+    std::cout << "\n=== Now recording!!"
+              << "Please whistle into the microphone. ===\n";
 
-    file.open("recorded.txt");
-    file << "Hz\t dB" << std::endl;
+    fftw_data.open("analyzed.txt");
+    // fftw_data << "Hz\t dB" << std::endl;
 
-    while( (( err = Pa_IsStreamActive( stream ) ) == 1) && (interrupt < 200) )
-    {
+    while( (( err = Pa_IsStreamActive( stream ) ) == 1) && (interrupt < 200) ) {
       data.frameIndex = 0;
-        // Pa_Sleep(1000);
-        fftw_execute(plan);
+      // auto start = std::chrono::system_clock::now();
+      // Pa_Sleep(1000);
+      fftw_execute(plan);
 
-    // Post-process frequency spectrum: transform to decibel
-        // std::vector<double> db_spectrum(NUM_BINS);
-        for(int i = 0; i < NUM_BINS; i++){
-           db_spectrum[i] = (20 *
-                              log10(sqrt(  data.fftwOutput[i] * data.fftwOutput[i]
-                              /*+ data.fftwOutput[i] * data.fftwOutput[i]*/))
-                            );// / SAMPLE_RATE;
-        }
-        std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
-                                                             db_spectrum.end());
-        std::cout << "Detected frequency: "
-                  << std::distance(db_spectrum.begin(), max)
-                  << " Hz at velocity " << *max * 127 << std::endl;
-        file << std::distance(db_spectrum.begin(), max) << "\t " << *max << std::endl;
-        std::cout << "Wrote data to recorded.txt." << std::endl;
-        std::cout << "index = " << data.frameIndex << std::endl; //fflush(stdout);
-        interrupt++;
+      // Post-process frequency spectrum: transform to decibel
+      // std::vector<double> db_spectrum(NUM_BINS);
+      for(int i = 0; i < NUM_BINS; i++){
+         db_spectrum[i] = (20 *
+                            log10(sqrt(  data.fftwOutput[i] * data.fftwOutput[i]
+                            /*+ data.fftwOutput[i] * data.fftwOutput[i]*/))
+                          ) / SAMPLE_RATE;
+      }
+      std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
+                                                           db_spectrum.end());
+      std::cout << "Detected frequency: "
+                << std::distance(db_spectrum.begin(), max)
+                << " Hz at velocity " << *max * 127 << std::endl;
+      fftw_data << std::distance(db_spectrum.begin(), max) /*<< "\t "
+                << *max */<< std::endl;
+      std::cout << "Wrote data to analyzed.txt." << std::endl;
+      std::cout << "index = " << data.frameIndex << std::endl;
+      // auto end = std::chrono::system_clock::now();
+      // std::chrono::duration<double> diff = end-start;
+      // std::cout << "Time[" << interrupt << "]: " << diff.count() << " s\n";
+      interrupt++;
     }
-    file.close();
+    fftw_data.close();
     if( err < 0 ) goto done;
 
     err = Pa_CloseStream( stream );
@@ -281,9 +306,11 @@ int main(void)
     /* Measure maximum peak amplitude. */
     max = 0;
     average = 0.0;
+    recorded_data.open("recorded.txt");
     for( i=0; i<numSamples; i++ )
     {
         val = data.recordedSamples[i];
+        recorded_data << data.recordedSamples[i] << std::endl;
         if( val < 0 ) val = -val; /* ABS */
         if( val > max )
         {
@@ -291,11 +318,12 @@ int main(void)
         }
         average += val;
     }
+    recorded_data.close();
 
     average = average / (double)numSamples;
 
-    printf("sample max amplitude = "PRINTF_S_FORMAT"\n", max );
-    printf("sample average = %lf\n", average );
+    std::cout << "sample max amplitude = " << max     << "\n";
+    std::cout << "sample average = "       << average << "\n";
 
 done:
     Pa_Terminate();
@@ -303,9 +331,9 @@ done:
         free( data.recordedSamples );
     if( err != paNoError )
     {
-        fprintf( stderr, "An error occured while using the portaudio stream\n" );
-        fprintf( stderr, "Error number: %d\n", err );
-        fprintf( stderr, "Error message: %s\n", Pa_GetErrorText( err ) );
+        std::cerr << "An error occured while using the portaudio stream\n";
+        std::cerr << "Error number: "  << err << "\n";
+        std::cerr << "Error message: " << Pa_GetErrorText( err ) << "\n";
         err = 1;          /* Always return 0 or 1, but no other return codes. */
     }
     fftw_destroy_plan(plan);

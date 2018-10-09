@@ -5,7 +5,7 @@ LDFLAGS=-lpthread -L${GTEST_BASE}/lib -lgtest
 
 INCLUDES=-I${GTEST_BASE}/include -I../
 
-OBJS = 		fton.o
+OBJS = 		note_of_freq.o
 
 .DEFAULT: all
 all: $(OBJS) fton_test.bin

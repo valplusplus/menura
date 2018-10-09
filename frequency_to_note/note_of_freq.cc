@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cmath>
 #include <vector>
+#include <fstream>
 
 namespace menura {
 
@@ -72,13 +73,19 @@ void note_setup() {
 
 note note_of(double frequency, double pitch_hz = 440.0) {
   int a4_idx = 57;
-  int note_idx = 12 * std::log2(frequency / pitch_hz) + a4_idx;
+  int note_idx = a4_idx;
+  if(frequency != 0) {
+    note_idx = 12 * std::log2(frequency / pitch_hz) + a4_idx;
+  }
   // cerr << "Detected note: " << notes[note_idx] << endl;
 
   double ideal_freq = pitch_hz * std::pow(2.0, (note_idx - a4_idx) / 12.0);
   // cerr << "Ideal frequency: " << ideal_freq << endl;
 
-  int cent_idx = 1200 * std::log2(frequency / ideal_freq);
+  int cent_idx = 0;
+  if(frequency != 0) {
+    cent_idx = 1200 * std::log2(frequency / ideal_freq);
+  }
   // cerr << "Difference in cents: " << cent_idx << endl;
 
   if(frequency >= ideal_freq) {
@@ -113,10 +120,10 @@ int main() {
   double frequency = 440.0;
   menura::note_setup();
 
-  for(int i = 0; i < 10; i++) {
+  std::ifstream infile("../experiments/portaudio/analyzed.txt");
+  while(infile >> frequency) {
     std::cerr << "Frequency " << frequency << " Hz --> Note ";
     menura::note_of(frequency);
-    frequency += 100.0;
   }
   return 0;
 }

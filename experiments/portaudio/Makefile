@@ -27,4 +27,6 @@ run: clean record.bin
 clean:
 	-rm -f *.o
 	-rm -f *.bin
+	-rm -f generated.txt
 	-rm -f recorded.txt
+	-rm -f analyzed.txt
