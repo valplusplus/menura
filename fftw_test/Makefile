@@ -5,7 +5,7 @@ LDFLAGS=-lpthread -L$TACC_FFTW3_LIB -lfftw3
 
 INCLUDES=-I${GTEST_BASE}/include -I../
 
-OBJS = 		fft_test.o
+OBJS = 		fftw_of_sine.o
 
 .DEFAULT: all
 all: $(OBJS) fft_test.bin
