@@ -38,6 +38,12 @@ struct note {
   : name(n_name)
   , accidental(n_acc)
   , octave(n_oct) {}
+
+  bool operator==(const note & rhs) const {
+    return (name == rhs.name
+         && accidental == rhs.accidental
+         && octave == rhs.octave);
+  }
 };
 
 std::ostream& operator<<(std::ostream& lhs, menura::note n) {
@@ -71,6 +77,15 @@ void note_setup() {
   }
 }
 
+int midi_number_of(note n) {
+  auto note_idx = std::find(std::begin(notes), std::end(notes), n);
+  int key = std::distance(notes.begin(), note_idx) + 12;
+
+  // std::cout << "Note "       << n
+  //           << " --> MIDI " << key
+  //           << std::endl;
+  return key;
+}
 
 note note_of(double frequency, double pitch_hz = 440.0) {
   int a4_idx = 57;
@@ -108,10 +123,11 @@ note note_of(double frequency, double pitch_hz = 440.0) {
     }
   }
 
-  std::cout << notes[note_idx]
-            << ((cent_idx >= 0) ? " (+"
-                                : " (")
-            << cent_idx << " cents)" << std::endl;
+  // std::cout << notes[note_idx]
+  //           << ((cent_idx >= 0) ? " (+"
+  //                               : " (")
+  //           << cent_idx << " cents)"
+  //           << std::endl;
 
   return notes[note_idx];
 }
@@ -130,8 +146,11 @@ int main() {
   auto freqs = stream.detected_frequencies();
 
   for(int i = 0; i < freqs.size(); i++) {
-    std::cerr << "Frequency " << freqs[i] << " Hz --> Note ";
-    menura::note_of(freqs[i]);
+    auto musical_note = menura::note_of(freqs[i]);
+    std::cerr << "Frequency " << freqs[i] << " Hz"
+              << " --> Note " << musical_note
+              << " --> MIDI " << menura::midi_number_of(musical_note)
+              << std::endl;
   }
   return 0;
 }
