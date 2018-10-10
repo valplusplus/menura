@@ -36,6 +36,10 @@
  * license above.
  */
 
+#ifndef MENURA__PA_STREAM_H__INCLUDED
+#define MENURA__PA_STREAM_H__INCLUDED
+
+
 #include <stdio.h>
 #include <stdlib.h>
 #include "portaudio.h"
@@ -129,4 +133,6 @@ private:
   double              average;
 };
 
-}
+} // namespace menura
+
+#endif // MENURA__PA_STREAM_H__INCLUDED

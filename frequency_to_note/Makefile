@@ -5,8 +5,9 @@ LDFLAGS=-lpthread -L$TACC_FFTW3_LIB -lfftw3 -lrt -lm -lasound -ljack -pthread -l
 
 INCLUDES=-I${GTEST_BASE}/include -I../
 
-OBJS = 		note_of_freq.o \
-			 pa_stream.o
+OBJS = 		main.o \
+					note_of_freq.o \
+			 		pa_stream.o
 
 .DEFAULT: all
 all: $(OBJS) fton_test.bin
