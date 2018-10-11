@@ -97,20 +97,18 @@ namespace menura {
   }
 
   void PortAudio::analyze() {
-    int interrupt = 0;
+    int repeat = 0;
     std::vector<double> db_spectrum(NUM_BINS);
     // fftw_data.open("analyzed.txt");
     // fftw_data << "Hz\t dB" << std::endl;
 
-    while((( err = Pa_IsStreamActive(stream)) == 1) && (interrupt < 2000)) {
+    while((( err = Pa_IsStreamActive(stream)) == 1) && (repeat < 2000)) {
       data.frameIndex = 0;
       fftw_execute(plan);
 
       // Post-process frequency spectrum: transform to decibel
       for(int i = 0; i < NUM_BINS; i++){
-         db_spectrum[i] = (20 *
-                            log10(sqrt(data.fftwOutput[i] * data.fftwOutput[i]))
-                          );
+         db_spectrum[i] = 20 * log10(data.fftwOutput[i]);
       }
       std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
                                                            db_spectrum.end());
@@ -118,7 +116,7 @@ namespace menura {
       frequencies.push_back(freq);
       // std::cout << "index = " << data.frameIndex << std::endl;
       auto musical_note = menura::note_of(freq);
-      if (interrupt % 67 == 0) {
+      if (repeat % 67 == 0) {
         if (*max > 30) {
           std::cerr << "Frequency " << freq << " Hz"
                     << " --> Note " << musical_note
@@ -127,7 +125,7 @@ namespace menura {
                     << std::endl;
         }
       }
-      interrupt++;
+      repeat++;
     }
   }
 
