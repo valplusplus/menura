@@ -1,11 +1,44 @@
-
 #include <vector>
+
+/**
+ * Frequency Spectrum Concept
+ * ===========================================================================
+ *
+ * Dependent Types/Concepts
+ * ---------------------------------------------------------------------------
+ *
+ * spectrum_bin b:
+ *   b.loudness();
+ *   b.freqency();
+ *
+ *
+ *
+ * Frequency        f   : double
+ * Loudness (dB)    l   : double
+ * Freq. Spectrum   fs ~> Random-Access Sequence
+ *
+ * expression                      | semantics
+ * ------------------------------- | -----------------------------------------
+ * frequency_spectrum(it_a, it_b)  | Create frequency spectrum from sequence
+ *                                   of audio input samples (represented as
+ *                                   iterator range)
+ * fs.begin(), fs.end()            | Random-access iterators on spectrum bins
+ * fs[bin_idx]                     | Bin at given index in the spectrum
+ * fs[f]                           | Loudness of given frequency in spectrum
+ * fs[note]                        | Loudness of given note in spectrum,
+ *                                   same as fs[frequency(note)]
+ * fs.find_fundamental()           | Returns iterator to bin representing the
+ *                                   fundamental frequency in spectrum
+ *
+ */
+
+
 
 namespace menura {
 
 /*   spectrum bin element:
  *
- *     auto bin_it = freq_spectrum.find_dominant();
+ *     auto bin_it = freq_spectrum.find_fundamental();
  *
  *     bin_it->db();
  *     bin_it->frequency();
@@ -56,16 +89,16 @@ public:
 
       frequencies.push_back(freq);
       auto musical_note = menura::note_of(freq);
-      if (repeat % 67 == 0) {
+      if (interrupt % 67 == 0) {
         if (*max > 30) {
           std::cerr << "Frequency " << freq << " Hz"
                     << " --> Note " << musical_note
-                    << " --> " << *max << " dB"
                     << " --> MIDI " << menura::midi_number_of(musical_note)
+                    << " --> dB " << *max
                     << std::endl;
         }
       }
-      repeat++;
+      interrupt++;
     }
   }
 
