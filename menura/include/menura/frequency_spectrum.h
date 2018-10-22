@@ -1,3 +1,4 @@
+
 #include <vector>
 
 /**
@@ -64,23 +65,44 @@ public:
 
 public:
   frequency_spectrum() = delete;
-  frequency_spectrum(const audio_istream & ais, int num_bins)
-    : _audio_in(ais)
-    , _db_spectrum(num_bins)
-  { }
+
+  template <class SampleInpuBeginIt, class SampleInputEndIt>
+  frequency_spectrum(
+    SampleInpuBeginIt s_begin,
+    SampleInputEndIt  s_end)
+    : _audio_in_begin(s_begin),
+    , _audio_in_end(s_end)
+    , _db_spectrum(std::distance(s_begin, s_end))
+  {
+    _sampling_data.maxFrameIndex = totalFrames; /* Record for a few seconds. */
+    _sampling_data.frameIndex = 0;
+
+    _sampling_data.recordedSamples = (double *) malloc(numBytes);
+    /* From now on, recordedSamples is initialised. */
+    _sampling_data.fftwOutput = (double *) malloc(numBytes);
+    plan = fftw_plan_r2r_1d(NUM_SAMPLES,
+                            _sampling_data.recordedSamples,
+                            _sampling_data.fftwOutput,
+                            FFTW_R2HC,
+                            FFTW_ESTIMATE);
+  }
+
+  ~frequency_spectrum() {
+      fftw_destroy_plan(plan);
+  }
 
   friend operator>>(audio_istream & audio_is, self_t & freq_spectrum);
 
   void analyze() {
     while((( err = Pa_IsStreamActive(stream)) == 1)) {
-      data.frameIndex = 0;
+      _sampling_data.frameIndex = 0;
       fftw_execute(plan);
 
       // Post-process frequency spectrum: transform to decibel
       for(int i = 0; i < NUM_BINS; i++){
          db_spectrum[i] = (20 *
-                            log10(sqrt(  data.fftwOutput[i]
-                                       * data.fftwOutput[i]))
+                            log10(sqrt(  _sampling_data.fftwOutput[i]
+                                       * _sampling_data.fftwOutput[i]))
                           );
       }
       std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
@@ -89,16 +111,16 @@ public:
 
       frequencies.push_back(freq);
       auto musical_note = menura::note_of(freq);
-      if (interrupt % 67 == 0) {
+      if (repeat % 67 == 0) {
         if (*max > 30) {
           std::cerr << "Frequency " << freq << " Hz"
                     << " --> Note " << musical_note
+                    << " --> " << *max << " dB"
                     << " --> MIDI " << menura::midi_number_of(musical_note)
-                    << " --> dB " << *max
                     << std::endl;
         }
       }
-      interrupt++;
+      repeat++;
     }
   }
 
