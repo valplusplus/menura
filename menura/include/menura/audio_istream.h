@@ -42,8 +42,11 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+
 #include "portaudio.h"
+
 #include <fftw3.h>
+
 #include <iostream>
 #include <fstream>
 #include <algorithm>
@@ -54,7 +57,6 @@
 
 namespace menura {
 
-/* #define SAMPLE_RATE  (17932) // Test failure to open with this value. */
 #define SAMPLE_RATE  (44100)
 #define FRAMES_PER_BUFFER (1024)
 #define MAX_BPM    (120)
@@ -64,10 +66,6 @@ namespace menura {
 #define NUM_CHANNELS    (1)
 #define NUM_SAMPLES    (NUM_SECONDS * SAMPLE_RATE * NUM_CHANNELS)
 #define NUM_BINS     (NUM_SAMPLES/2)-1
-/* #define DITHER_FLAG     (paDitherOff) */
-#define DITHER_FLAG     (0)
-
-//#define N_SAMPLES  (SAMPLE_RATE / (FRAMES_PER_BUFFER / 60 * 2))
 
 /* Select sample format. */
 #if 1
@@ -80,16 +78,6 @@ typedef float SAMPLE;
 typedef short SAMPLE;
 #define SAMPLE_SILENCE  (0)
 #define PRINTF_S_FORMAT "%d"
-#elif 0
-#define PA_SAMPLE_TYPE  paInt8
-typedef char SAMPLE;
-#define SAMPLE_SILENCE  (0)
-#define PRINTF_S_FORMAT "%d"
-#else
-#define PA_SAMPLE_TYPE  paUInt8
-typedef unsigned char SAMPLE;
-#define SAMPLE_SILENCE  (128)
-#define PRINTF_S_FORMAT "%d"
 #endif
 
 typedef struct
@@ -101,15 +89,18 @@ typedef struct
 }
 paTestData;
 
-class PortAudio {
+class audio_istream {
 public:
-  PortAudio();
-  ~PortAudio();
-  bool init();
+  audio_istream() = delete;
+  audio_istream(const menura::program_options & opts);
+
+  ~audio_istream();
+
   bool open();
   bool record();
   void analyze();
-  std::vector<double> detected_frequencies();
+
+  std::vector<double> frequencies();
   static int recordCallback( const void * inputBuffer
                            , void * outputBuffer
                            , unsigned long framesPerBuffer
@@ -131,6 +122,14 @@ private:
   fftw_plan           plan;
   SAMPLE              max, val;
   double              average;
+
+private:
+  void log_port_audio_rc(int err) {
+    if (err != paNoError) {
+      std::cerr << "ERROR: PortAudio: "
+                << Pa_GetErrorText(err) << " (" << err << ")\n";
+    }
+  }
 };
 
 } // namespace menura

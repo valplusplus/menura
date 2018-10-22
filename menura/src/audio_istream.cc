@@ -3,7 +3,7 @@
 
 namespace menura {
 
-  PortAudio::PortAudio()
+  audio_istream::audio_istream()
   : totalFrames(NUM_SECONDS * SAMPLE_RATE)
   , numSamples(totalFrames * NUM_CHANNELS)
   , numBytes(numSamples * sizeof(double))
@@ -19,47 +19,40 @@ namespace menura {
                             data.fftwOutput,
                             FFTW_R2HC,
                             FFTW_ESTIMATE);
+    err = Pa_Initialize();
+    if (err != paNoError) {
+      std::cerr << "ERROR: initializing audio_istream: "
+                << Pa_GetErrorText(err) << " (" << err << ")\n";
+    }
+    initialized = true;
   }
 
-  PortAudio::~PortAudio() {
+  audio_istream::~audio_istream() {
     if (initialized) {
       err = Pa_CloseStream(stream);
-      if (err != paNoError) {
-        std::cerr << "An error occured while closing the PortAudio stream: "
-                  << Pa_GetErrorText(err) << " (" << err << ")\n";
-      }
+      log_port_audio_rc(err);
       Pa_Terminate();
       fftw_destroy_plan(plan);
     }
   }
 
-  bool PortAudio::init() {
-    err = Pa_Initialize();
-    if (err != paNoError) {
-      std::cerr << "An error occured while initializing PortAudio: "
-                  << Pa_GetErrorText(err) << " (" << err << ")\n";
-      return false;
-    }
-    initialized = true;
-    return true;
-  }
-
-  bool PortAudio::open() {
+  bool audio_istream::open() {
     inputParameters.device = Pa_GetDefaultInputDevice();
     if (inputParameters.device == paNoDevice) {
         std::cerr << "Error: No default input device.\n";
         return false;
     }
-    inputParameters.channelCount = 1;                    /* mono input */
+    inputParameters.channelCount = 1;
     inputParameters.sampleFormat = PA_SAMPLE_TYPE;
-    inputParameters.suggestedLatency = Pa_GetDeviceInfo(inputParameters.device)
-                                     ->defaultLowInputLatency;
+    inputParameters.suggestedLatency = Pa_GetDeviceInfo(
+                                         inputParameters.device
+                                       )->defaultLowInputLatency;
     inputParameters.hostApiSpecificStreamInfo = NULL;
 
     return true;
   }
 
-  bool PortAudio::record() {
+  bool audio_istream::record() {
     /* Record some audio. -------------------------------------------- */
     err = Pa_OpenStream(
               &stream,
@@ -75,7 +68,7 @@ namespace menura {
       Pa_Terminate();
       if( data.recordedSamples )       /* Sure it is NULL or valid. */
         free( data.recordedSamples );
-        std::cerr << "An error occured while opening the PortAudio stream: "
+        std::cerr << "An error occured while opening the audio_istream stream: "
                   << Pa_GetErrorText(err) << " (" << err << ")\n";
         return false;
     }
@@ -85,7 +78,7 @@ namespace menura {
       Pa_Terminate();
       if( data.recordedSamples )       /* Sure it is NULL or valid. */
         free( data.recordedSamples );
-        std::cerr << "An error occured while starting the PortAudio stream: "
+        std::cerr << "An error occured while starting the audio_istream stream: "
                   << Pa_GetErrorText(err) << " (" << err << ")\n";
         return false;
     }
@@ -96,44 +89,12 @@ namespace menura {
     return true;
   }
 
-  void PortAudio::analyze() {
-    int repeat = 0;
-    std::vector<double> db_spectrum(NUM_BINS);
-    // fftw_data.open("analyzed.txt");
-    // fftw_data << "Hz\t dB" << std::endl;
 
-    while((( err = Pa_IsStreamActive(stream)) == 1) && (repeat < 2000)) {
-      data.frameIndex = 0;
-      fftw_execute(plan);
-
-      // Post-process frequency spectrum: transform to decibel
-      for(int i = 0; i < NUM_BINS; i++){
-         db_spectrum[i] = 20 * log10(data.fftwOutput[i]);
-      }
-      std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
-                                                           db_spectrum.end());
-      auto freq = std::distance(db_spectrum.begin(), max);
-      frequencies.push_back(freq);
-      // std::cout << "index = " << data.frameIndex << std::endl;
-      auto musical_note = menura::note_of(freq);
-      if (repeat % 67 == 0) {
-        if (*max > 30) {
-          std::cerr << "Frequency " << freq << " Hz"
-                    << " --> Note " << musical_note
-                    << " --> MIDI " << menura::midi_number_of(musical_note)
-                    << " --> dB " << *max
-                    << std::endl;
-        }
-      }
-      repeat++;
-    }
-  }
-
-  /* This routine will be called by the PortAudio engine when audio is needed.
+  /* This routine will be called by the audio_istream engine when audio is needed.
   ** It may be called at interrupt level on some machines so don't do anything
   ** that could mess up the system like calling malloc() or free().
   */
-  int PortAudio::recordCallback( const void *inputBuffer, void *outputBuffer,
+  int audio_istream::recordCallback( const void *inputBuffer, void *outputBuffer,
                              unsigned long framesPerBuffer,
                              const PaStreamCallbackTimeInfo* timeInfo,
                              PaStreamCallbackFlags statusFlags,
@@ -184,7 +145,7 @@ namespace menura {
       return finished;
   }
 
-  std::vector<double> PortAudio::detected_frequencies() {
+  std::vector<double> audio_istream::frequencies() {
     return frequencies;
   }
 

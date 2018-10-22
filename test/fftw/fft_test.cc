@@ -3,10 +3,12 @@
 
 #include <fftw3.h>
 #include <iostream>
+#include <algorithm>
 #include <cmath>
 #include "gnuplot.h"
 
 #include <vector>
+#include <iterator>
 
 #define REAL 0
 #define IMAG 1
@@ -42,8 +44,8 @@ int main() {
     theta[i]        = (static_cast<double>(i)/static_cast<double>(N_SAMPLES))
                     * 2.0 * M_PI;
     signal[i][REAL] = A   * sin(freq_a * theta[i])
-                    + A/2 * sin(freq_c * theta[i])
-                    + A/3 * sin(freq_e * theta[i])
+                    // + A/2 * sin(freq_c * theta[i])
+                    // + A/3 * sin(freq_e * theta[i])
                       ;
     signal[i][IMAG] = 0;
 
@@ -60,10 +62,15 @@ int main() {
   std::vector<double> db_spectrum(N_BINS);
   for(int i = 0; i < N_BINS; i++){
      db_spectrum[i] = (20 *
-                        log(sqrt(  result[i][REAL] * result[i][REAL]
-                                 + result[i][IMAG] * result[i][IMAG]))
-                      ) / F_SAMPLING;
+                        log10(result[i][REAL] * result[i][REAL]
+                            + result[i][IMAG] * result[i][IMAG]))
+                      );
   }
+  std::vector<double>::iterator max = std::max_element(db_spectrum.begin(),
+                                                       db_spectrum.end());
+  std::cout << "Detected frequency: "
+            << std::distance(db_spectrum.begin(), max)
+            << " Hz at velocity " << *max << std::endl;
 
   gp_db_spectrum.plot_xrange(350, N_BINS);
 
