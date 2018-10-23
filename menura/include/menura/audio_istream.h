@@ -7,6 +7,7 @@
 #include <stdlib.h>
 
 #include "portaudio.h"
+#include "options.h"
 
 #include <fftw3.h>
 
@@ -84,16 +85,18 @@ private:
 
   PaStreamParameters  inputParameters;
   PaStream *          stream;
-  std::vector<double> frequencies;
+  std::vector<double> freqs;
   PaError             err              = paNoError;
-  pa_sampling_data    data;
+  pa_sampling_data    _sampling_data;
   bool                initialized;
+  menura::program_options _opts;
   int                 totalFrames;
   int                 numSamples;
   int                 numBytes;
   fftw_plan           plan;
   SAMPLE              max, val;
   double              average;
+  static int          numChannels;
 
 private:
   void log_port_audio_rc(int err) {

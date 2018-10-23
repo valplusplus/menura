@@ -6,7 +6,7 @@ LDFLAGS=-lpthread -L$TACC_FFTW3_LIB -lfftw3 -lrt -lm -lasound -ljack -pthread -l
 
 INCLUDES=-I${GTEST_BASE}/include -I../
 
-OBJS = 		../../menura/src/note_of_freq.o \
+OBJS = 		../../menura/src/note.o \
 			 ../../menura/src/audio_istream.o
 
 .DEFAULT: all

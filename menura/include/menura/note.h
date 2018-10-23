@@ -5,7 +5,8 @@
 #include <cmath>
 #include <vector>
 #include <fstream>
-#include "pa_stream.h"
+#include "audio_istream.h"
+// #include "options.h"
 
 
 /**
@@ -66,7 +67,7 @@ namespace menura {
 
   public:
     note() = delete;
-    note(double frequency, double pitch_class = 440.0) {
+    note(double frequency, double pitch_hz = 440.0) {
       // start off from A4:
       *this = note(pitch_class::A, 4);
 
@@ -76,7 +77,7 @@ namespace menura {
       double ideal_freq = pitch_hz
                           * std::pow(
                               2.0,
-                              (note_idx - a4_idx) / 12.0);
+                              (*this - note(pitch_class::A, 4)) / 12.0);
 
       int cent_idx = 0;
       if(frequency != 0) {
@@ -85,14 +86,14 @@ namespace menura {
 
       if(frequency >= ideal_freq) {
         if(cent_idx > 50) {
-          *this++;
+          --(*this);
           cent_idx = 100 - cent_idx;
           if(cent_idx != 0)
             cent_idx = (-1) * cent_idx;
         }
       } else {
         if(cent_idx >= 50) {
-          *this--;
+          --(*this);
           cent_idx = 100 - cent_idx;
         } else {
           if(cent_idx != 0)
@@ -101,15 +102,16 @@ namespace menura {
       }
     }
 
-    note(pitch p, uint8_t octave)
+    note(pitch_class p, uint8_t octave)
        : _pitch(p), _octave(octave) {  }
 
     note(const note & other)
-       : _pitch(other.p), _octave(other.octave) {  }
+       : _pitch(other._pitch), _octave(other._octave) {  }
 
     note & operator=(const note & rhs) {
-      _pitch  = rhs.pitch;
-      _octave = rhs.octave;
+      _pitch  = rhs._pitch;
+      _octave = rhs._octave;
+      return *this;
     }
 
     // Heighten note by given number of semitones
@@ -118,7 +120,7 @@ namespace menura {
          _octave++; _pitch = C;
        }
        else {
-         _pitch = static_cast<pitch_class>(static_cast<int>(_pitch) + 1)
+         _pitch = static_cast<pitch_class>(static_cast<int>(_pitch) + 1);
        }
        return *this;
     }
@@ -133,12 +135,22 @@ namespace menura {
          _pitch = pitch_class::B;
        }
        else {
-         _pitch = static_cast<pitch_class>(static_cast<int>(_pitch) - 1)
+         _pitch = static_cast<pitch_class>(static_cast<int>(_pitch) - 1);
        }
        return *this;
     }
     note & operator--() {
       return *this -= 1;
+    }
+
+    int operator-(const note & rhs) const {
+      if(_pitch == rhs._pitch) {
+        return _octave - rhs._octave;
+      }
+      if(_octave == rhs._octave) {
+        return _pitch - rhs._pitch;
+      }
+      return (_pitch - rhs._pitch) + ((_octave - rhs._octave) - 1) * 12;
     }
 
     bool operator==(const note & rhs) const {
@@ -173,11 +185,11 @@ namespace menura {
 
   std::ostream & operator<<(std::ostream & lhs, const menura::note & n);
 
-  int chromatic_index(const note & n);
-
-  int distance(const note & a, const & note b) {
-    return chromatic_index(b) - chromatic_index(a);
-  }
+  // int chromatic_index(const note & n);
+  //
+  // int distance(const note & a, const note & b) {
+  //   return chromatic_index(b) - chromatic_index(a);
+  // }
 
 } // namespace menura
 

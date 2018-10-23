@@ -1,11 +1,12 @@
-#include "../include/menura/note.h"
+// #include "../include/menura/note.h"
 #include "../include/menura/audio_istream.h"
 
 namespace menura {
 
-audio_istream::audio_istream()
-    : totalFrames(NUM_SECONDS * SAMPLE_RATE),
-      numSamples(totalFrames * NUM_CHANNELS),
+audio_istream::audio_istream(const menura::program_options & opts)
+    : _opts(opts),
+      totalFrames(opts.num_seconds * opts.sample_rate),
+      numSamples(totalFrames * opts.num_channels),
       numBytes(numSamples * sizeof(double)) {
   _sampling_data.maxFrameIndex = totalFrames; /* Record for a few seconds. */
   _sampling_data.frameIndex = 0;
@@ -13,7 +14,7 @@ audio_istream::audio_istream()
   _sampling_data.recordedSamples = (double *)malloc(numBytes); /* From now on,
                                     recordedSamples is initialised. */
   _sampling_data.fftwOutput = (double *)malloc(numBytes);
-  plan = fftw_plan_r2r_1d(NUM_SAMPLES, _sampling_data.recordedSamples, _sampling_data.fftwOutput,
+  plan = fftw_plan_r2r_1d(opts.num_samples, _sampling_data.recordedSamples, _sampling_data.fftwOutput,
                           FFTW_R2HC, FFTW_ESTIMATE);
   err = Pa_Initialize();
   if (err != paNoError) {
@@ -50,7 +51,7 @@ bool audio_istream::record() {
   /* Record some audio. -------------------------------------------- */
   err =
       Pa_OpenStream(&stream, &inputParameters, NULL, /* &outputParameters, */
-                    SAMPLE_RATE, FRAMES_PER_BUFFER,
+                    _opts.sample_rate, _opts.frames_per_buffer,
                     paClipOff, /* we won't output out of range samples so don't
                                                         bother clipping them */
                     recordCallback, &_sampling_data);
@@ -94,7 +95,7 @@ int audio_istream::recordCallback(const void    *inputBuffer,
   const SAMPLE *rptr = (const SAMPLE *)inputBuffer;
   double *wptr = &_sampling_data
                     ->recordedSamples[
-                      _sampling_data->frameIndex * NUM_CHANNELS];
+                      _sampling_data->frameIndex * numChannels];
   long framesToCalc;
   long i;
   int finished;
@@ -117,13 +118,13 @@ int audio_istream::recordCallback(const void    *inputBuffer,
   if (inputBuffer == NULL) {
     for (i = 0; i < framesToCalc; i++) {
       *wptr++ = SAMPLE_SILENCE; /* left */
-      if (NUM_CHANNELS == 2)
+      if (numChannels == 2)
         *wptr++ = SAMPLE_SILENCE; /* right */
     }
   } else {
     for (i = 0; i < framesToCalc; i++) {
       *wptr++ = *rptr++; /* left */
-      if (NUM_CHANNELS == 2)
+      if (numChannels == 2)
         *wptr++ = *rptr++; /* right */
     }
   }
@@ -132,6 +133,6 @@ int audio_istream::recordCallback(const void    *inputBuffer,
   return finished;
 }
 
-std::vector<double> audio_istream::frequencies() { return frequencies; }
+std::vector<double> audio_istream::frequencies() { return freqs; }
 
 } // namespace menura
