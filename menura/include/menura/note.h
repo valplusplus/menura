@@ -20,8 +20,8 @@
  *
  * expression           | semantics
  * -------------------- | ----------------------------------------------------
- * note(p,o)            | Create node from pitch class and octave
- * note(f,ft)           | Create node from frequency f for tuning freq. ft
+ * note(p,o)            | Create note from pitch class and octave
+ * note(f,ft)           | Create note from frequency f for tuning freq. ft
  * n1 != n2, n1 == n2   | Equality, inequality
  * n1 < n2, n1 > n2 ... | Sort comparison, based on pitch range (semitones)
  * octave(n)            | The note's octave
